@@ -352,6 +352,7 @@ export const en = {
   chatInputPhotoLibrary: 'Photos',
   chatInputPickFiles: 'Files',
   tokenUsageSummary: '{total} tokens ({cached} in cached · {miss} in uncached · {output} out)',
+  contextUsageSummary: 'Context {percent}% used · {used} / {window}',
   updateSectionLabel: 'Version & Updates',
   updateCurrentVersion: 'Current version: v{version} ({platform})',
   updateAutoCheckLabel: 'Check for updates on launch',

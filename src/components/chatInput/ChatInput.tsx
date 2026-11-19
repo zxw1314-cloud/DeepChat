@@ -60,6 +60,45 @@ import { Spectrum } from './Spectrum.js'
 import { useTranslate } from '../../i18n/index.js'
 import styles from './ChatInput.module.css'
 
+/**
+ * 上下文窗口大小。模型名是从接口动态发现的，项目里没有窗口元数据，
+ * 这里先按 1M 取值，后续应改为设置项或按模型名推断。
+ */
+const CONTEXT_WINDOW = 1_000_000
+
+/** 达到该比例后环线转为警示色，提示即将触发截断 */
+const CONTEXT_DANGER_RATIO = 0.9
+
+/** 达到该比例后环线转为提醒色，提前预警 */
+const CONTEXT_WARN_RATIO = 0.7
+
+/** 环形进度：半径与周长（viewBox 32x32） */
+const RING_RADIUS = 13.5
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
+
+/** 压缩成 12.2K / 128K / 1M 这类紧凑写法 */
+const formatTokenCount = (value: number): string => {
+  if (value >= 1_000_000) {
+    return `${Math.round(value / 100_000) / 10}M`
+  }
+  if (value >= 1000) {
+    return `${Math.round(value / 100) / 10}K`
+  }
+  return String(Math.round(value))
+}
+
+/** 环内空间有限，只保留整数位：38K / 1.2M */
+const formatRingTokens = (value: number): string => {
+  if (value >= 1_000_000) {
+    return `${Math.round(value / 100_000) / 10}M`
+  }
+  if (value >= 1000) {
+    return `${Math.round(value / 1000)}K`
+  }
+  return String(Math.round(value))
+}
+
+
 /** 输入框：自适应高度的文本框 + 文件 + 深度思考与智能搜索开关 + 语音输入 + 发送 / 停止 */
 export const ChatInput = memo(function ChatInput({ sessionId }: { sessionId: string | null }) {
   // 切换目标时释放录音、转写和 DOM 状态；文字与附件由草稿服务保留。
@@ -79,6 +118,40 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
   const thinkingEffort = useSettings((state) => state.thinkingEffort)
   const chatProtocol = useSettings((state) => state.chatProtocol)
   const importingHistory = useChatStore((state) => state.importingHistory)
+  /** 最近一轮回复实际送入模型的输入 token，即当前上下文占用量 */
+  const contextUsage = useChatStore((state) => {
+    const messages = sessionId ? state.sessionCache[sessionId]?.messages : undefined
+    if (!messages) {
+      return null
+    }
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index]
+      if (message.role === 'assistant' && message.usage) {
+        return message.usage
+      }
+    }
+    return null
+  })
+  const contextTokens = contextUsage
+    ? contextUsage.input_tokens +
+      contextUsage.cache_creation_input_tokens +
+      contextUsage.cache_read_input_tokens
+    : 0
+  const contextRatio = Math.min(1, contextTokens / CONTEXT_WINDOW)
+  const contextLabel = contextTokens
+    ? t('contextUsageSummary', {
+        percent: (contextRatio * 100).toFixed(contextRatio < 0.1 ? 1 : 0),
+        used: formatTokenCount(contextTokens),
+        window: formatTokenCount(CONTEXT_WINDOW),
+      })
+    : ''
+  /** 环线颜色分级：常规 / 提醒（≥70%）/ 警示（≥90%） */
+  const contextLevel =
+    contextRatio >= CONTEXT_DANGER_RATIO
+      ? styles.contextRingDanger
+      : contextRatio >= CONTEXT_WARN_RATIO
+        ? styles.contextRingWarn
+        : null
   const isMobile = useIsMobile()
   const search = useSettings((state) => state.search)
   const imageGen = useSettings((state) => state.imageGen)
@@ -631,6 +704,35 @@ const Input = ({ sessionId }: { sessionId: string | null }) => {
             ) : null}
           </div>
           <div className={styles.right}>
+            {contextLabel ? (
+              <Tooltip content={contextLabel}>
+                <button
+                  type="button"
+                  className={clsx(styles.contextRing, contextLevel)}
+                  aria-label={contextLabel}
+                  onClick={() => {
+                    // 移动端没有悬停，点按后把完整数值以轻提示展示
+                    if (isMobile) {
+                      showToast(contextLabel)
+                    }
+                  }}
+                >
+                  <svg viewBox="0 0 32 32" aria-hidden="true">
+                    <circle cx="16" cy="16" r={RING_RADIUS} className={styles.contextRingTrack} />
+                    <circle
+                      cx="16"
+                      cy="16"
+                      r={RING_RADIUS}
+                      className={styles.contextRingFill}
+                      strokeDasharray={`${contextRatio * RING_CIRCUMFERENCE} ${RING_CIRCUMFERENCE}`}
+                    />
+                  </svg>
+                  <span className={styles.contextRingLabel} aria-hidden="true">
+                    {formatRingTokens(contextTokens)}
+                  </span>
+                </button>
+              </Tooltip>
+            ) : null}
             <Tooltip content={t('chatInputMoreActions')}>
               <button
                 type="button"

@@ -329,6 +329,69 @@
   margin-left: auto;
 }
 
+/* 上下文窗口占用环，与右侧按钮组同尺寸 */
+.contextRing {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--dsw-alias-brand-primary);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.2s ease;
+}
+
+.contextRing svg {
+  width: 100%;
+  height: 100%;
+}
+
+.contextRing circle {
+  fill: none;
+  stroke-width: 2;
+}
+
+.contextRingTrack {
+  stroke: var(--dsw-alias-bg-skeleton);
+}
+
+.contextRingFill {
+  stroke: currentColor;
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+  transition: stroke-dasharray 0.3s ease;
+}
+
+/* 夹在环内的占用量，字号受环径限制 */
+.contextRingLabel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/* 达到 70% 转为提醒色 */
+.contextRingWarn {
+  color: var(--dsw-static-amber-500);
+}
+
+/* 达到 90% 转为警示色，提示即将触发截断 */
+.contextRingDanger {
+  color: var(--dsw-alias-state-error-primary);
+}
+
 .sendButton {
   display: flex;
   align-items: center;
